@@ -1,12 +1,17 @@
 package resolv
 
-import "math"
+// Inspired by https://www.azurefromthetrenches.com/introductory-guide-to-aabb-tree-collision-detection/
+
+import (
+	"math"
+	"reflect"
+)
 
 type AABBData struct {
 	minX, minY, maxX, maxY float64
 }
 
-func (aabb AABBData) AABB() AABBData {
+func (aabb *AABBData) AABB() *AABBData {
 	return aabb
 }
 func (aabb AABBData) SurfaceArea() float64 {
@@ -16,7 +21,7 @@ func (aabb AABBData) SurfaceArea() float64 {
 }
 
 type AABB interface {
-	AABB() AABBData
+	AABB() *AABBData
 }
 
 type AABBTree struct {
@@ -25,23 +30,71 @@ type AABBTree struct {
 
 type AABBTreeNode struct {
 	Object     AABB
-	ObjectAABB AABBData
+	ObjectAABB *AABBData
 
 	Parent, Left, Right *AABBTreeNode
+
+	depth int
 }
 
 func (node *AABBTreeNode) IsLeaf() bool {
 	return node.Left == nil
 }
-func (node *AABBTreeNode) AABB() AABBData {
+func (node *AABBTreeNode) AABB() *AABBData {
 	return node.ObjectAABB
 }
 
 func NewAABBTreeNode(object AABB) *AABBTreeNode {
+	if reflect.ValueOf(object).Kind() != reflect.Ptr {
+		panic("provided object must be a pointer")
+	}
 	return &AABBTreeNode{
 		Object:     object,
 		ObjectAABB: object.AABB(),
 	}
+}
+
+type AABBTreeNodeStack struct {
+	data []*AABBTreeNode
+}
+
+func NewStack() *AABBTreeNodeStack {
+	return &AABBTreeNodeStack{
+		data: make([]*AABBTreeNode, 0, 1),
+	}
+}
+func (stack *AABBTreeNodeStack) Push(node *AABBTreeNode) {
+	stack.data = append(stack.data, node)
+}
+func (stack *AABBTreeNodeStack) Pop() *AABBTreeNode {
+	next := stack.data[len(stack.data)-1]
+	stack.data = stack.data[:len(stack.data)-1]
+	return next
+}
+func (stack *AABBTreeNodeStack) Empty() bool {
+	return len(stack.data) == 0
+}
+
+func (tree *AABBTree) Depth() int {
+	stack := NewStack()
+	stack.Push(tree.Root)
+	var maxDepth int
+	for !stack.Empty() {
+		next := stack.Pop()
+		if next.Left != nil {
+			next.Left.depth = next.depth + 1
+			stack.Push(next.Left)
+		}
+		if next.Right != nil {
+			next.Right.depth = next.depth + 1
+			stack.Push(next.Right)
+		}
+
+		if maxDepth < next.depth+1 {
+			maxDepth = next.depth + 1
+		}
+	}
+	return maxDepth
 }
 
 func (tree *AABBTree) Add(node *AABBTreeNode) {
@@ -135,13 +188,78 @@ func (tree *AABBTree) fixUpwardsTree(node *AABBTreeNode) {
 	}
 }
 
-func Merge(a, b AABB) AABBData {
+// QueryOverlaps checks for overlapping AABB objects. Be aware that if two
+func (tree *AABBTree) QueryOverlaps(object AABB) []AABB {
+	if reflect.ValueOf(object).Kind() != reflect.Ptr {
+		panic("provided object must be a pointer")
+	}
+	// std::forward_list<std::shared_ptr<IAABB>> AABBTree::queryOverlaps(const std::shared_ptr<IAABB>& object) const
+	// {
+	// 	std::forward_list<std::shared_ptr<IAABB>> overlaps;
+	// 	std::stack<unsigned> stack;
+	// 	AABB testAabb = object->getAABB();
+	overlaps := make([]AABB, 0)
+	stack := NewStack()
+	testAABB := object.AABB()
+	// 	stack.push(_rootNodeIndex);
+	// 	while(!stack.empty())
+	// 	{
+	stack.Push(tree.Root)
+	for !stack.Empty() {
+		// 		unsigned nodeIndex = stack.top();
+		// 		stack.pop();
+		node := stack.Pop()
+
+		// 		if (nodeIndex == AABB_NULL_NODE) continue;
+
+		// 		const AABBNode& node = _nodes[nodeIndex];
+		if Overlaps(node, testAABB) {
+			// 		if (node.aabb.overlaps(testAabb))
+			// 		{
+			if node.IsLeaf() && node.Object != object {
+				// 			if (node.isLeaf() && node.object != object)
+				// 			{
+				overlaps = append(overlaps, node)
+				// 				overlaps.push_front(node.object);
+				// 			}
+				// 			else
+			} else {
+				if node.Left != nil {
+					stack.Push(node.Left)
+				}
+				if node.Right != nil {
+					stack.Push(node.Right)
+				}
+				// 			{
+				// 				stack.push(node.leftNodeIndex);
+				// 				stack.push(node.rightNodeIndex);
+				// 			}
+				// 		}
+				// 	}
+			}
+		}
+	}
+	return overlaps
+	// 	return overlaps;
+	// }
+}
+
+func Merge(a, b AABB) *AABBData {
 	aData := a.AABB()
 	bData := b.AABB()
-	return AABBData{
+	return &AABBData{
 		minX: math.Min(aData.minX, bData.minX),
 		minY: math.Min(aData.minY, bData.minY),
 		maxX: math.Max(aData.maxX, bData.maxX),
 		maxY: math.Max(aData.maxX, bData.maxY),
 	}
+}
+
+func Overlaps(a, b AABB) bool {
+	aData := a.AABB()
+	bData := b.AABB()
+	return aData.maxX > bData.minX &&
+		aData.minX < bData.maxX &&
+		aData.maxY > bData.minY &&
+		aData.minY < bData.maxY
 }
