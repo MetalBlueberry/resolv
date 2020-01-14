@@ -82,7 +82,7 @@ func TestAABBTree_Add_Random(t *testing.T) {
 	count := 100000
 	rand.Seed(time.Now().Unix())
 
-	brute := make([]*AABBTreeNode, 0, count)
+	brute := make([]AABB, 0, count)
 	t.Run("Build", func(t *testing.T) {
 		start := time.Now()
 		assert.Nil(t, tree.Root)
@@ -91,9 +91,9 @@ func TestAABBTree_Add_Random(t *testing.T) {
 			x := rand.Float64()*100 - 50
 			y := rand.Float64()*100 - 50
 
-			node := NewAABBTreeNode(move(base, float64(x), float64(y)))
-			tree.insertLeaf(node)
-			brute = append(brute, node)
+			object := move(base, float64(x), float64(y))
+			tree.Insert(object)
+			brute = append(brute, object)
 		}
 		t.Log(time.Since(start))
 		t.Logf("Depth %d", tree.Depth())

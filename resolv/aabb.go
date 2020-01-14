@@ -251,7 +251,7 @@ func (tree *AABBTree) QueryOverlaps(object AABB) []AABB {
 			if node.IsLeaf() && node.Object != object {
 				// 			if (node.isLeaf() && node.object != object)
 				// 			{
-				overlaps = append(overlaps, node)
+				overlaps = append(overlaps, node.Object)
 				// 				overlaps.push_front(node.object);
 				// 			}
 				// 			else
