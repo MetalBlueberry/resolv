@@ -8,16 +8,44 @@ import (
 )
 
 type AABBData struct {
-	minX, minY, maxX, maxY float64
+	MinX, MinY, MaxX, MaxY float64
 }
 
 func (aabb *AABBData) AABB() *AABBData {
 	return aabb
 }
-func (aabb AABBData) SurfaceArea() float64 {
-	a := aabb.maxX - aabb.minX
-	b := aabb.maxY - aabb.minY
+func (aabb *AABBData) SurfaceArea() float64 {
+	a := aabb.MaxX - aabb.MinX
+	b := aabb.MaxY - aabb.MinY
 	return a * b
+}
+
+func (aabb *AABBData) Merge(other *AABBData) *AABBData {
+	return Merge(aabb, other)
+}
+
+func Merge(a, b AABB) *AABBData {
+	aData := a.AABB()
+	bData := b.AABB()
+	return &AABBData{
+		MinX: math.Min(aData.MinX, bData.MinX),
+		MinY: math.Min(aData.MinY, bData.MinY),
+		MaxX: math.Max(aData.MaxX, bData.MaxX),
+		MaxY: math.Max(aData.MaxX, bData.MaxY),
+	}
+}
+
+func (aabb *AABBData) Overlaps(other *AABBData) bool {
+	return Overlaps(aabb, other)
+}
+
+func Overlaps(a, b AABB) bool {
+	aData := a.AABB()
+	bData := b.AABB()
+	return aData.MaxX > bData.MinX &&
+		aData.MinX < bData.MaxX &&
+		aData.MaxY > bData.MinY &&
+		aData.MinY < bData.MaxY
 }
 
 type AABB interface {
@@ -29,19 +57,12 @@ type AABBTree struct {
 }
 
 type AABBTreeNode struct {
-	Object     AABB
-	ObjectAABB *AABBData
+	Object AABB
 
 	Parent, Left, Right *AABBTreeNode
 
-	depth int
-}
-
-func (node *AABBTreeNode) IsLeaf() bool {
-	return node.Left == nil
-}
-func (node *AABBTreeNode) AABB() *AABBData {
-	return node.ObjectAABB
+	objectAABB *AABBData
+	depth      int
 }
 
 func NewAABBTreeNode(object AABB) *AABBTreeNode {
@@ -50,8 +71,15 @@ func NewAABBTreeNode(object AABB) *AABBTreeNode {
 	}
 	return &AABBTreeNode{
 		Object:     object,
-		ObjectAABB: object.AABB(),
+		objectAABB: object.AABB(),
 	}
+}
+
+func (node *AABBTreeNode) IsLeaf() bool {
+	return node.Left == nil
+}
+func (node *AABBTreeNode) AABB() *AABBData {
+	return node.objectAABB
 }
 
 type AABBTreeNodeStack struct {
@@ -183,7 +211,7 @@ func (tree *AABBTree) Add(node *AABBTreeNode) {
 
 func (tree *AABBTree) fixUpwardsTree(node *AABBTreeNode) {
 	for node != nil {
-		node.ObjectAABB = Merge(node.Left, node.Right)
+		node.objectAABB = Merge(node.Left, node.Right)
 		node = node.Parent
 	}
 }
@@ -242,24 +270,4 @@ func (tree *AABBTree) QueryOverlaps(object AABB) []AABB {
 	return overlaps
 	// 	return overlaps;
 	// }
-}
-
-func Merge(a, b AABB) *AABBData {
-	aData := a.AABB()
-	bData := b.AABB()
-	return &AABBData{
-		minX: math.Min(aData.minX, bData.minX),
-		minY: math.Min(aData.minY, bData.minY),
-		maxX: math.Max(aData.maxX, bData.maxX),
-		maxY: math.Max(aData.maxX, bData.maxY),
-	}
-}
-
-func Overlaps(a, b AABB) bool {
-	aData := a.AABB()
-	bData := b.AABB()
-	return aData.maxX > bData.minX &&
-		aData.minX < bData.maxX &&
-		aData.maxY > bData.minY &&
-		aData.minY < bData.maxY
 }

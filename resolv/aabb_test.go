@@ -71,10 +71,10 @@ func TestAABBTree_Add(t *testing.T) {
 
 func TestAABBTree_Add_Random(t *testing.T) {
 	move := func(data AABBData, x, y float64) *AABBData {
-		data.minX += x
-		data.maxX += x
-		data.minY += y
-		data.maxY += y
+		data.MinX += x
+		data.MaxX += x
+		data.MinY += y
+		data.MaxY += y
 		return &data
 	}
 	tree := &AABBTree{}
