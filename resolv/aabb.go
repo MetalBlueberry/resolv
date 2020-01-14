@@ -86,9 +86,9 @@ type AABBTreeNodeStack struct {
 	data []*AABBTreeNode
 }
 
-func NewStack() *AABBTreeNodeStack {
+func NewAABBTreeNodeStack() *AABBTreeNodeStack {
 	return &AABBTreeNodeStack{
-		data: make([]*AABBTreeNode, 0, 1),
+		data: make([]*AABBTreeNode, 0),
 	}
 }
 func (stack *AABBTreeNodeStack) Push(node *AABBTreeNode) {
@@ -104,7 +104,7 @@ func (stack *AABBTreeNodeStack) Empty() bool {
 }
 
 func (tree *AABBTree) Depth() int {
-	stack := NewStack()
+	stack := NewAABBTreeNodeStack()
 	stack.Push(tree.Root)
 	var maxDepth int
 	for !stack.Empty() {
@@ -227,7 +227,7 @@ func (tree *AABBTree) QueryOverlaps(object AABB) []AABB {
 	// 	std::stack<unsigned> stack;
 	// 	AABB testAabb = object->getAABB();
 	overlaps := make([]AABB, 0)
-	stack := NewStack()
+	stack := NewAABBTreeNodeStack()
 	testAABB := object.AABB()
 	// 	stack.push(_rootNodeIndex);
 	// 	while(!stack.empty())
