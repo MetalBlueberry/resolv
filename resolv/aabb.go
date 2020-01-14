@@ -125,7 +125,12 @@ func (tree *AABBTree) Depth() int {
 	return maxDepth
 }
 
-func (tree *AABBTree) Add(node *AABBTreeNode) {
+func (tree *AABBTree) Insert(object AABB) {
+	node := NewAABBTreeNode(object)
+	tree.insertLeaf(node)
+}
+
+func (tree *AABBTree) insertLeaf(node *AABBTreeNode) {
 
 	// if the tree is empty then we make the root the leaf
 	if tree.Root == nil {
@@ -216,7 +221,6 @@ func (tree *AABBTree) fixUpwardsTree(node *AABBTreeNode) {
 	}
 }
 
-// QueryOverlaps checks for overlapping AABB objects. Be aware that if two
 func (tree *AABBTree) QueryOverlaps(object AABB) []AABB {
 	if reflect.ValueOf(object).Kind() != reflect.Ptr {
 		panic("provided object must be a pointer")

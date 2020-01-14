@@ -60,10 +60,10 @@ func TestAABBTree_Add(t *testing.T) {
 	t.Run("Build", func(t *testing.T) {
 		assert.Nil(t, tree.Root)
 
-		tree.Add(center)
+		tree.insertLeaf(center)
 		assert.Equal(t, tree.Root, center)
 
-		tree.Add(left)
+		tree.insertLeaf(left)
 		assert.NotEqual(t, tree.Root, center)
 		assert.NotEqual(t, tree.Root, left)
 	})
@@ -92,7 +92,7 @@ func TestAABBTree_Add_Random(t *testing.T) {
 			y := rand.Float64()*100 - 50
 
 			node := NewAABBTreeNode(move(base, float64(x), float64(y)))
-			tree.Add(node)
+			tree.insertLeaf(node)
 			brute = append(brute, node)
 		}
 		t.Log(time.Since(start))
