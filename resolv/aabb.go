@@ -48,6 +48,21 @@ func Overlaps(a, b AABB) bool {
 		aData.MinY < bData.MaxY
 }
 
+// Move returns a copy of the data displaced by a given vector
+func (aabb *AABBData) Move(x, y float64) *AABBData {
+	return Move(aabb, x, y)
+}
+
+func Move(obj AABB, x, y float64) *AABBData {
+	data := obj.AABB()
+	return &AABBData{
+		MinX: data.MinX + x,
+		MaxX: data.MaxX + x,
+		MinY: data.MinY + y,
+		MaxY: data.MaxY + y,
+	}
+}
+
 type AABB interface {
 	AABB() *AABBData
 }

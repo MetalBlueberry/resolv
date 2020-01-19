@@ -70,13 +70,6 @@ func TestAABBTree_Add(t *testing.T) {
 }
 
 func TestAABBTree_Add_Random(t *testing.T) {
-	move := func(data AABBData, x, y float64) *AABBData {
-		data.MinX += x
-		data.MaxX += x
-		data.MinY += y
-		data.MaxY += y
-		return &data
-	}
 	tree := &AABBTree{}
 	base := AABBData{0, 0, 1, 1}
 	count := 100000
@@ -91,7 +84,7 @@ func TestAABBTree_Add_Random(t *testing.T) {
 			x := rand.Float64()*100 - 50
 			y := rand.Float64()*100 - 50
 
-			object := move(base, float64(x), float64(y))
+			object := base.Move(float64(x), float64(y))
 			tree.Insert(object)
 			brute = append(brute, object)
 		}
