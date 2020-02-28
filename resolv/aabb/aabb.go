@@ -17,8 +17,17 @@ type AABB interface {
 	AABB() *AABBData
 }
 
+// AABBData represents the AABB coordinates.
 type AABBData struct {
 	MinX, MinY, MaxX, MaxY float64
+}
+
+func NewAABBData(MinX, MinY, MaxX, MaxY float64) (*AABBData, error) {
+	data := &AABBData{MinX, MinY, MaxX, MaxY}
+	if !data.IsValid() {
+		return nil, errors.New("Shape is invalid, did you swap Min and Max values?")
+	}
+	return data, nil
 }
 
 func (aabb *AABBData) AABB() *AABBData {
@@ -70,4 +79,8 @@ func Move(obj AABB, x, y float64) *AABBData {
 		MinY: data.MinY + y,
 		MaxY: data.MaxY + y,
 	}
+}
+
+func (aabb *AABBData) IsValid() bool {
+	return aabb.MaxX > aabb.MinY && aabb.MaxY > aabb.MinY
 }
