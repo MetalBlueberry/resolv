@@ -39,8 +39,41 @@ func newTreeNode(object AABB) *treeNode {
 func (node *treeNode) IsLeaf() bool {
 	return node.Left == nil
 }
+
 func (node *treeNode) AABB() *AABBData {
 	return node.ObjectAABB
+}
+
+func (node *treeNode) GetSibling() *treeNode {
+	parent := node.Parent
+	if parent == nil {
+		panic("node doesn't contain a parent")
+	}
+	switch node {
+	case parent.Left:
+		return parent.Right
+	case parent.Right:
+		return parent.Left
+	default:
+		panic("parent doesn't contain children, Tree is corrupted.")
+	}
+}
+
+func (node *treeNode) replaceWith(other *treeNode) {
+	parent := node.Parent
+	if parent == nil {
+		panic("node doesn't contain a parent")
+	}
+	other.Parent = parent
+
+	switch node {
+	case parent.Left:
+		parent.Left = other
+	case parent.Right:
+		parent.Right = other
+	default:
+		panic("parent doesn't contain children, Tree is corrupted.")
+	}
 }
 
 type TreeNodeStack struct {
@@ -110,76 +143,25 @@ func (tree *Tree) Remove(object AABB) {
 	delete(tree.NodeIndexMap, object)
 }
 func (tree *Tree) removeLeaf(node *treeNode) {
-	// // if the leaf is the root then we can just clear the root pointer and return
-	// if (leafNodeIndex == _rootNodeIndex)
 	if node == tree.Root {
-		// {
-		// 	_rootNodeIndex = AABB_NULL_NODE;
 		tree.Root = nil
-		// 	return;
-		// }
+		return
 	}
 
-	// AABBNode& leafNode = _nodes[leafNodeIndex];
-	// unsigned parentNodeIndex = leafNode.parentNodeIndex;
-	// const AABBNode& parentNode = _nodes[parentNodeIndex];
 	parent := node.Parent
-	// unsigned grandParentNodeIndex = parentNode.parentNodeIndex;
 	grandParent := parent.Parent
-	// unsigned siblingNodeIndex = parentNode.leftNodeIndex == leafNodeIndex ? parentNode.rightNodeIndex : parentNode.leftNodeIndex;
+	sibling := node.GetSibling()
 
-	var sibling *treeNode
-	switch node {
-	case parent.Left:
-		sibling = parent.Right
-	case parent.Right:
-		sibling = parent.Left
-	default:
-		panic("parent doesn't contain children, Tree is corrupted.")
-	}
-	// assert(siblingNodeIndex != AABB_NULL_NODE); // we must have a sibling
-	// AABBNode& siblingNode = _nodes[siblingNodeIndex];
-
-	// if (grandParentNodeIndex != AABB_NULL_NODE)
-	if grandParent != nil {
-		// {
-		// 	// if we have a grand parent (i.e. the parent is not the root) then destroy the parent and connect the sibling to the grandparent in its
-		// 	// place
-		// 	AABBNode& grandParentNode = _nodes[grandParentNodeIndex];
-		switch parent {
-		case grandParent.Left:
-			grandParent.Left = sibling
-		case grandParent.Right:
-			grandParent.Right = sibling
-		}
-		// 	if (grandParentNode.leftNodeIndex == parentNodeIndex)
-		// 	{
-		// 		grandParentNode.leftNodeIndex = siblingNodeIndex;
-		// 	}
-		// 	else
-		// 	{
-		// 		grandParentNode.rightNodeIndex = siblingNodeIndex;
-		// 	}
-		// 	siblingNode.parentNodeIndex = grandParentNodeIndex;
-		parent = grandParent
-		// 	deallocateNode(parentNodeIndex);
-		// 	fixUpwardsTree(grandParentNodeIndex);
-		tree.fixUpwardsTree(grandParent)
-		// }
-	} else {
-		// else
-		// {
-		// 	// if we have no grandparent then the parent is the root and so our sibling becomes the root and has it's parent removed
-		tree.Root = sibling
-		sibling.Parent = nil
-		// 	_rootNodeIndex = siblingNodeIndex;
-		// 	siblingNode.parentNodeIndex = AABB_NULL_NODE;
-		// 	deallocateNode(parentNodeIndex);
-		// }
-	}
 	node.Parent = nil
 
-	// leafNode.parentNodeIndex = AABB_NULL_NODE;
+	if grandParent == nil {
+		tree.Root = sibling
+		sibling.Parent = nil
+		return
+	}
+
+	parent.replaceWith(sibling)
+	tree.fixUpwardsTree(grandParent)
 }
 
 func (tree *Tree) insertLeaf(node *treeNode) {
@@ -192,53 +174,44 @@ func (tree *Tree) insertLeaf(node *treeNode) {
 
 	// search for the best place to put the new leaf in the tree
 	// we use surface area and depth as search heuristics
-	treeNode := tree.Root
-	for !treeNode.IsLeaf() {
+	currentNode := tree.Root
+	for !currentNode.IsLeaf() {
 
 		// because of the test in the while loop above we know we are never a leaf inside it
-		leftNode := treeNode.Left
-		rightNode := treeNode.Right
+		leftNode := currentNode.Left
+		rightNode := currentNode.Right
 
-		combinedAabb := Merge(treeNode, node)
+		combinedAabb := Merge(currentNode, node)
 
 		newParentNodeCost := 2.0 * combinedAabb.SurfaceArea()
-		minimumPushDownCost := 2.0 * (combinedAabb.SurfaceArea() - treeNode.AABB().SurfaceArea())
+		minimumPushDownCost := 2.0 * (combinedAabb.SurfaceArea() - currentNode.AABB().SurfaceArea())
 
-		// use the costs to figure out whether to create a new parent here or descend
-		var (
-			costLeft  float64
-			costRight float64
-		)
-		if leftNode.IsLeaf() {
-			costLeft = Merge(node, leftNode).SurfaceArea() + minimumPushDownCost
-		} else {
-			newLeftAabb := Merge(node, leftNode)
-			costLeft = (newLeftAabb.SurfaceArea() - leftNode.AABB().SurfaceArea()) + minimumPushDownCost
+		costFunc := func(side *treeNode) float64 {
+			if side.IsLeaf() {
+				return Merge(node, side).SurfaceArea() + minimumPushDownCost
+			} else {
+				newAABB := Merge(node, side)
+				return (newAABB.SurfaceArea() - side.AABB().SurfaceArea()) + minimumPushDownCost
+			}
 		}
-		if rightNode.IsLeaf() {
-			costRight = Merge(node, rightNode).SurfaceArea() + minimumPushDownCost
-		} else {
-			newRightAabb := Merge(node, rightNode)
-			costRight = (newRightAabb.SurfaceArea() - rightNode.AABB().SurfaceArea()) + minimumPushDownCost
-		}
+		costLeft := costFunc(leftNode)
+		costRight := costFunc(rightNode)
 
-		// 	// if the cost of creating a new parent node here is less than descending in either direction then
-		// 	// we know we need to create a new parent node, errrr, here and attach the leaf to that
 		if newParentNodeCost < costLeft && newParentNodeCost < costRight {
 			break
 		}
 
 		// 	// otherwise descend in the cheapest direction
 		if costLeft < costRight {
-			treeNode = leftNode
+			currentNode = leftNode
 		} else {
-			treeNode = rightNode
+			currentNode = rightNode
 		}
 	}
 
 	// // the leafs sibling is going to be the node we found above and we are going to create a new
 	// // parent node and attach the leaf and this item
-	sibling := treeNode
+	sibling := currentNode
 	oldParent := sibling.Parent
 
 	newParent := newTreeNode(Merge(node, sibling))
@@ -249,20 +222,15 @@ func (tree *Tree) insertLeaf(node *treeNode) {
 	node.Parent = newParent
 	sibling.Parent = newParent
 
-	if oldParent == nil {
-		// the old parent was the root and so this is now the root
+	switch {
+	case oldParent == nil:
 		tree.Root = newParent
-	} else {
-		// the old parent was not the root and so we need to patch the left or right index to
-		// point to the new node
-		if oldParent.Left == sibling {
-			oldParent.Left = newParent
-		} else {
-			oldParent.Right = newParent
-		}
+	case oldParent.Left == sibling:
+		oldParent.Left = newParent
+	case oldParent.Right == sibling:
+		oldParent.Right = newParent
 	}
 
-	// // finally we need to walk back up the tree fixing heights and areas
 	tree.fixUpwardsTree(node.Parent)
 }
 
