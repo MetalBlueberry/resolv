@@ -1,4 +1,4 @@
-package resolv
+package tree_test
 
 import (
 	"math"
@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	. "github.com/SolarLune/resolv/resolv/tree"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -142,7 +143,7 @@ func TestAABBTree_query(t *testing.T) {
 	})
 
 	t.Run("Query empty tree", func(t *testing.T) {
-		a := NewAABBTreeNode(&AABBData{-1, -1, 1, 1})
+		a := &AABBData{-1, -1, 1, 1}
 
 		tree := NewAABBTree()
 
@@ -154,8 +155,8 @@ func TestAABBTree_query(t *testing.T) {
 func TestAABBTree_Remove(t *testing.T) {
 	t.Run("Simple Insert/Removal", func(t *testing.T) {
 		tree := NewAABBTree()
-		a := NewAABBTreeNode(&AABBData{-1, -1, 1, 1})
-		b := NewAABBTreeNode(&AABBData{-2, 0, -1, 1})
+		a := &AABBData{-1, -1, 1, 1}
+		b := &AABBData{-2, 0, -1, 1}
 
 		assert.Nil(t, tree.Root)
 
@@ -183,8 +184,8 @@ func TestAABBTree_Remove(t *testing.T) {
 	})
 
 	t.Run("Insert/Remove from big tree", func(t *testing.T) {
-		a := NewAABBTreeNode(&AABBData{-1, -1, 1, 1})
-		b := NewAABBTreeNode(&AABBData{-2, 0, -1, 1})
+		a := &AABBData{-1, -1, 1, 1}
+		b := &AABBData{-2, 0, -1, 1}
 
 		tree := NewAABBTree()
 		base := AABBData{0, 0, 1, 1}

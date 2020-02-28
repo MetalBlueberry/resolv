@@ -1,130 +1,33 @@
-package resolv
-
-// Inspired by https://www.azurefromthetrenches.com/introductory-guide-to-aabb-tree-collision-detection/
+package tree
 
 import (
-	"errors"
-	"math"
 	"reflect"
 )
 
-var (
-	ErrtNotInTree    = errors.New("The object is not in the tree")
-	ErrAlreadyInTree = errors.New("The object is already in the tree")
-)
-
-type AABBData struct {
-	MinX, MinY, MaxX, MaxY float64
-}
-
-func (aabb *AABBData) AABB() *AABBData {
-	return aabb
-}
-func (aabb *AABBData) SurfaceArea() float64 {
-	a := aabb.MaxX - aabb.MinX
-	b := aabb.MaxY - aabb.MinY
-	return a * b
-}
-
-func (aabb *AABBData) Merge(other *AABBData) *AABBData {
-	return Merge(aabb, other)
-}
-
-func Merge(a, b AABB) *AABBData {
-	aData := a.AABB()
-	bData := b.AABB()
-	return &AABBData{
-		MinX: math.Min(aData.MinX, bData.MinX),
-		MinY: math.Min(aData.MinY, bData.MinY),
-		MaxX: math.Max(aData.MaxX, bData.MaxX),
-		MaxY: math.Max(aData.MaxY, bData.MaxY),
-	}
-}
-
-func (aabb *AABBData) Overlaps(other *AABBData) bool {
-	return Overlaps(aabb, other)
-}
-
-func Overlaps(a, b AABB) bool {
-	aData := a.AABB()
-	bData := b.AABB()
-	return aData.MaxX > bData.MinX &&
-		aData.MinX < bData.MaxX &&
-		aData.MaxY > bData.MinY &&
-		aData.MinY < bData.MaxY
-}
-
-// Move returns a copy of the data displaced by a given vector
-func (aabb *AABBData) Move(x, y float64) *AABBData {
-	return Move(aabb, x, y)
-}
-
-func Move(obj AABB, x, y float64) *AABBData {
-	data := obj.AABB()
-	return &AABBData{
-		MinX: data.MinX + x,
-		MaxX: data.MaxX + x,
-		MinY: data.MinY + y,
-		MaxY: data.MaxY + y,
-	}
-}
-
-type AABB interface {
-	AABB() *AABBData
-}
-
 type AABBTree struct {
-	Root         *AABBTreeNode
-	NodeIndexMap map[AABB]*AABBTreeNode
+	Root         *aabbTreeNode
+	NodeIndexMap map[AABB]*aabbTreeNode
 }
 
 func NewAABBTree() *AABBTree {
 	return &AABBTree{
-		NodeIndexMap: make(map[AABB]*AABBTreeNode),
+		NodeIndexMap: make(map[AABB]*aabbTreeNode),
 	}
-}
-
-type AABBTreeNode struct {
-	Object     AABB      `json:"-"`
-	ObjectAABB *AABBData `json:"aabb"`
-
-	Parent *AABBTreeNode `json:"-"`
-	Left   *AABBTreeNode `json:"left"`
-	Right  *AABBTreeNode `json:"right"`
-
-	Depth int `json:"depth"`
-}
-
-func NewAABBTreeNode(object AABB) *AABBTreeNode {
-	if reflect.ValueOf(object).Kind() != reflect.Ptr {
-		panic("provided object must be a pointer")
-	}
-	return &AABBTreeNode{
-		Object:     object,
-		ObjectAABB: object.AABB(),
-	}
-}
-
-func (node *AABBTreeNode) IsLeaf() bool {
-	return node.Left == nil
-}
-func (node *AABBTreeNode) AABB() *AABBData {
-	return node.ObjectAABB
 }
 
 type aabbTreeNodeStack struct {
-	data []*AABBTreeNode
+	data []*aabbTreeNode
 }
 
 func newAABBTreeNodeStack() *aabbTreeNodeStack {
 	return &aabbTreeNodeStack{
-		data: make([]*AABBTreeNode, 0),
+		data: make([]*aabbTreeNode, 0),
 	}
 }
-func (stack *aabbTreeNodeStack) Push(node *AABBTreeNode) {
+func (stack *aabbTreeNodeStack) Push(node *aabbTreeNode) {
 	stack.data = append(stack.data, node)
 }
-func (stack *aabbTreeNodeStack) Pop() *AABBTreeNode {
+func (stack *aabbTreeNodeStack) Pop() *aabbTreeNode {
 	next := stack.data[len(stack.data)-1]
 	stack.data = stack.data[:len(stack.data)-1]
 	return next
@@ -164,7 +67,7 @@ func (tree *AABBTree) Insert(object AABB) {
 		panic(ErrAlreadyInTree)
 	}
 
-	node := NewAABBTreeNode(object)
+	node := newAABBTreeNode(object)
 	tree.insertLeaf(node)
 	tree.NodeIndexMap[object] = node
 }
@@ -178,7 +81,7 @@ func (tree *AABBTree) Remove(object AABB) {
 	tree.removeLeaf(node)
 	delete(tree.NodeIndexMap, object)
 }
-func (tree *AABBTree) removeLeaf(node *AABBTreeNode) {
+func (tree *AABBTree) removeLeaf(node *aabbTreeNode) {
 	// // if the leaf is the root then we can just clear the root pointer and return
 	// if (leafNodeIndex == _rootNodeIndex)
 	if node == tree.Root {
@@ -197,7 +100,7 @@ func (tree *AABBTree) removeLeaf(node *AABBTreeNode) {
 	grandParent := parent.Parent
 	// unsigned siblingNodeIndex = parentNode.leftNodeIndex == leafNodeIndex ? parentNode.rightNodeIndex : parentNode.leftNodeIndex;
 
-	var sibling *AABBTreeNode
+	var sibling *aabbTreeNode
 	switch node {
 	case parent.Left:
 		sibling = parent.Right
@@ -251,7 +154,7 @@ func (tree *AABBTree) removeLeaf(node *AABBTreeNode) {
 	// leafNode.parentNodeIndex = AABB_NULL_NODE;
 }
 
-func (tree *AABBTree) insertLeaf(node *AABBTreeNode) {
+func (tree *AABBTree) insertLeaf(node *aabbTreeNode) {
 
 	// if the tree is empty then we make the root the leaf
 	if tree.Root == nil {
@@ -310,7 +213,7 @@ func (tree *AABBTree) insertLeaf(node *AABBTreeNode) {
 	sibling := treeNode
 	oldParent := sibling.Parent
 
-	newParent := NewAABBTreeNode(Merge(node, sibling))
+	newParent := newAABBTreeNode(Merge(node, sibling))
 	newParent.Parent = oldParent
 	newParent.Left = sibling
 	newParent.Right = node
@@ -335,7 +238,7 @@ func (tree *AABBTree) insertLeaf(node *AABBTreeNode) {
 	tree.fixUpwardsTree(node.Parent)
 }
 
-func (tree *AABBTree) fixUpwardsTree(node *AABBTreeNode) {
+func (tree *AABBTree) fixUpwardsTree(node *aabbTreeNode) {
 	for node != nil {
 		node.ObjectAABB = Merge(node.Left, node.Right)
 		node = node.Parent
