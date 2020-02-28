@@ -98,8 +98,7 @@ func TestAABBTree_query(t *testing.T) {
 	t.Run("Test performance", func(t *testing.T) {
 		tree := NewTree()
 		base := AABBData{0, 0, 1, 1}
-		count := 1000
-		rand.Seed(time.Now().Unix())
+		count := 10000
 
 		brute := make([]AABB, 0, count)
 		t.Run("Build big tree", func(t *testing.T) {
@@ -121,6 +120,8 @@ func TestAABBTree_query(t *testing.T) {
 			start := time.Now()
 			queryOverlaps := tree.QueryOverlaps(&base)
 			queryTime := time.Since(start)
+
+			assert.NotEmpty(t, queryOverlaps)
 
 			start = time.Now()
 			bruteOverlaps := make([]AABB, 0)
