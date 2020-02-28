@@ -1,16 +1,16 @@
-package tree
+package aabb
 
 // Inspired by https://www.azurefromthetrenches.com/introductory-guide-to-aabb-tree-collision-detection/
 
 import (
 	"errors"
 	"math"
-	"reflect"
 )
 
 var (
 	ErrtNotInTree    = errors.New("The object is not in the tree")
 	ErrAlreadyInTree = errors.New("The object is already in the tree")
+	ErrNotAReference = errors.New("Objects must be passed by reference")
 )
 
 type AABB interface {
@@ -70,32 +70,4 @@ func Move(obj AABB, x, y float64) *AABBData {
 		MinY: data.MinY + y,
 		MaxY: data.MaxY + y,
 	}
-}
-
-type aabbTreeNode struct {
-	Object     AABB      `json:"-"`
-	ObjectAABB *AABBData `json:"aabb"`
-
-	Parent *aabbTreeNode `json:"-"`
-	Left   *aabbTreeNode `json:"left"`
-	Right  *aabbTreeNode `json:"right"`
-
-	Depth int `json:"depth"`
-}
-
-func newAABBTreeNode(object AABB) *aabbTreeNode {
-	if reflect.ValueOf(object).Kind() != reflect.Ptr {
-		panic("provided object must be a pointer")
-	}
-	return &aabbTreeNode{
-		Object:     object,
-		ObjectAABB: object.AABB(),
-	}
-}
-
-func (node *aabbTreeNode) IsLeaf() bool {
-	return node.Left == nil
-}
-func (node *aabbTreeNode) AABB() *AABBData {
-	return node.ObjectAABB
 }

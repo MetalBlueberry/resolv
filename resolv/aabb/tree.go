@@ -1,47 +1,75 @@
-package tree
+package aabb
 
 import (
 	"reflect"
 )
 
-type AABBTree struct {
-	Root         *aabbTreeNode
-	NodeIndexMap map[AABB]*aabbTreeNode
+type Tree struct {
+	Root         *treeNode
+	NodeIndexMap map[AABB]*treeNode
 }
 
-func NewAABBTree() *AABBTree {
-	return &AABBTree{
-		NodeIndexMap: make(map[AABB]*aabbTreeNode),
+func NewTree() *Tree {
+	return &Tree{
+		NodeIndexMap: make(map[AABB]*treeNode),
 	}
 }
 
-type aabbTreeNodeStack struct {
-	data []*aabbTreeNode
+type treeNode struct {
+	Object     AABB      `json:"-"`
+	ObjectAABB *AABBData `json:"aabb"`
+
+	Parent *treeNode `json:"-"`
+	Left   *treeNode `json:"left"`
+	Right  *treeNode `json:"right"`
+
+	Depth int `json:"depth"`
 }
 
-func newAABBTreeNodeStack() *aabbTreeNodeStack {
-	return &aabbTreeNodeStack{
-		data: make([]*aabbTreeNode, 0),
+func newTreeNode(object AABB) *treeNode {
+	if reflect.ValueOf(object).Kind() != reflect.Ptr {
+		panic(ErrNotAReference)
+	}
+	return &treeNode{
+		Object:     object,
+		ObjectAABB: object.AABB(),
 	}
 }
-func (stack *aabbTreeNodeStack) Push(node *aabbTreeNode) {
+
+func (node *treeNode) IsLeaf() bool {
+	return node.Left == nil
+}
+func (node *treeNode) AABB() *AABBData {
+	return node.ObjectAABB
+}
+
+type TreeNodeStack struct {
+	data []*treeNode
+}
+
+func newTreeNodeStack() *TreeNodeStack {
+	return &TreeNodeStack{
+		data: make([]*treeNode, 0),
+	}
+}
+func (stack *TreeNodeStack) Push(node *treeNode) {
 	stack.data = append(stack.data, node)
 }
-func (stack *aabbTreeNodeStack) Pop() *aabbTreeNode {
+func (stack *TreeNodeStack) Pop() *treeNode {
 	next := stack.data[len(stack.data)-1]
 	stack.data = stack.data[:len(stack.data)-1]
 	return next
 }
-func (stack *aabbTreeNodeStack) Empty() bool {
+func (stack *TreeNodeStack) Empty() bool {
 	return len(stack.data) == 0
 }
 
-func (tree *AABBTree) IsEmpty() bool {
+func (tree *Tree) IsEmpty() bool {
 	return tree.Root == nil
 }
 
-func (tree *AABBTree) Depth() int {
-	stack := newAABBTreeNodeStack()
+func (tree *Tree) Depth() int {
+	stack := newTreeNodeStack()
 	stack.Push(tree.Root)
 	var maxDepth int
 	for !stack.Empty() {
@@ -62,17 +90,17 @@ func (tree *AABBTree) Depth() int {
 	return maxDepth
 }
 
-func (tree *AABBTree) Insert(object AABB) {
+func (tree *Tree) Insert(object AABB) {
 	if tree.NodeIndexMap[object] != nil {
 		panic(ErrAlreadyInTree)
 	}
 
-	node := newAABBTreeNode(object)
+	node := newTreeNode(object)
 	tree.insertLeaf(node)
 	tree.NodeIndexMap[object] = node
 }
 
-func (tree *AABBTree) Remove(object AABB) {
+func (tree *Tree) Remove(object AABB) {
 
 	node, ok := tree.NodeIndexMap[object]
 	if !ok {
@@ -81,7 +109,7 @@ func (tree *AABBTree) Remove(object AABB) {
 	tree.removeLeaf(node)
 	delete(tree.NodeIndexMap, object)
 }
-func (tree *AABBTree) removeLeaf(node *aabbTreeNode) {
+func (tree *Tree) removeLeaf(node *treeNode) {
 	// // if the leaf is the root then we can just clear the root pointer and return
 	// if (leafNodeIndex == _rootNodeIndex)
 	if node == tree.Root {
@@ -100,7 +128,7 @@ func (tree *AABBTree) removeLeaf(node *aabbTreeNode) {
 	grandParent := parent.Parent
 	// unsigned siblingNodeIndex = parentNode.leftNodeIndex == leafNodeIndex ? parentNode.rightNodeIndex : parentNode.leftNodeIndex;
 
-	var sibling *aabbTreeNode
+	var sibling *treeNode
 	switch node {
 	case parent.Left:
 		sibling = parent.Right
@@ -154,7 +182,7 @@ func (tree *AABBTree) removeLeaf(node *aabbTreeNode) {
 	// leafNode.parentNodeIndex = AABB_NULL_NODE;
 }
 
-func (tree *AABBTree) insertLeaf(node *aabbTreeNode) {
+func (tree *Tree) insertLeaf(node *treeNode) {
 
 	// if the tree is empty then we make the root the leaf
 	if tree.Root == nil {
@@ -213,7 +241,7 @@ func (tree *AABBTree) insertLeaf(node *aabbTreeNode) {
 	sibling := treeNode
 	oldParent := sibling.Parent
 
-	newParent := newAABBTreeNode(Merge(node, sibling))
+	newParent := newTreeNode(Merge(node, sibling))
 	newParent.Parent = oldParent
 	newParent.Left = sibling
 	newParent.Right = node
@@ -238,16 +266,16 @@ func (tree *AABBTree) insertLeaf(node *aabbTreeNode) {
 	tree.fixUpwardsTree(node.Parent)
 }
 
-func (tree *AABBTree) fixUpwardsTree(node *aabbTreeNode) {
+func (tree *Tree) fixUpwardsTree(node *treeNode) {
 	for node != nil {
 		node.ObjectAABB = Merge(node.Left, node.Right)
 		node = node.Parent
 	}
 }
 
-func (tree *AABBTree) QueryOverlaps(object AABB) []AABB {
+func (tree *Tree) QueryOverlaps(object AABB) []AABB {
 	if reflect.ValueOf(object).Kind() != reflect.Ptr {
-		panic("provided object must be a pointer")
+		panic(ErrNotAReference)
 	}
 	// std::forward_list<std::shared_ptr<IAABB>> AABBTree::queryOverlaps(const std::shared_ptr<IAABB>& object) const
 	// {
@@ -260,7 +288,7 @@ func (tree *AABBTree) QueryOverlaps(object AABB) []AABB {
 		return overlaps
 	}
 
-	stack := newAABBTreeNodeStack()
+	stack := newTreeNodeStack()
 	testAABB := object.AABB()
 	// 	stack.push(_rootNodeIndex);
 	// 	while(!stack.empty())

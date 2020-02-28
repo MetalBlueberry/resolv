@@ -1,4 +1,4 @@
-package tree_test
+package aabb_test
 
 import (
 	"math"
@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	. "github.com/SolarLune/resolv/resolv/tree"
+	. "github.com/SolarLune/resolv/resolv/aabb"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -60,7 +60,7 @@ func TestAABBTree_Insert(t *testing.T) {
 	b := &AABBData{-2, 0, -1, 1}
 
 	t.Run("Insert two nodes", func(t *testing.T) {
-		tree := NewAABBTree()
+		tree := NewTree()
 		assert.Nil(t, tree.Root)
 
 		tree.Insert(a)
@@ -72,7 +72,7 @@ func TestAABBTree_Insert(t *testing.T) {
 	})
 
 	t.Run("Insert the same node twice", func(t *testing.T) {
-		tree := NewAABBTree()
+		tree := NewTree()
 		assert.Nil(t, tree.Root)
 
 		tree.Insert(a)
@@ -96,7 +96,7 @@ func TestAABBTree_Insert(t *testing.T) {
 
 func TestAABBTree_query(t *testing.T) {
 	t.Run("Test performance", func(t *testing.T) {
-		tree := NewAABBTree()
+		tree := NewTree()
 		base := AABBData{0, 0, 1, 1}
 		count := 1000
 		rand.Seed(time.Now().Unix())
@@ -145,7 +145,7 @@ func TestAABBTree_query(t *testing.T) {
 	t.Run("Query empty tree", func(t *testing.T) {
 		a := &AABBData{-1, -1, 1, 1}
 
-		tree := NewAABBTree()
+		tree := NewTree()
 
 		overlaps := tree.QueryOverlaps(a)
 		assert.Empty(t, overlaps)
@@ -154,7 +154,7 @@ func TestAABBTree_query(t *testing.T) {
 
 func TestAABBTree_Remove(t *testing.T) {
 	t.Run("Simple Insert/Removal", func(t *testing.T) {
-		tree := NewAABBTree()
+		tree := NewTree()
 		a := &AABBData{-1, -1, 1, 1}
 		b := &AABBData{-2, 0, -1, 1}
 
@@ -187,7 +187,7 @@ func TestAABBTree_Remove(t *testing.T) {
 		a := &AABBData{-1, -1, 1, 1}
 		b := &AABBData{-2, 0, -1, 1}
 
-		tree := NewAABBTree()
+		tree := NewTree()
 		base := AABBData{0, 0, 1, 1}
 		count := 1000
 
@@ -232,7 +232,7 @@ func TestAABBTree_Remove(t *testing.T) {
 
 	t.Run("Remove non existing object", func(t *testing.T) {
 		a := &AABBData{-1, -1, 1, 1}
-		tree := NewAABBTree()
+		tree := NewTree()
 		assert.PanicsWithValue(t, ErrtNotInTree, func() {
 			tree.Remove(a)
 		})
