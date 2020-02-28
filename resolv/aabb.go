@@ -31,7 +31,7 @@ func Merge(a, b AABB) *AABBData {
 		MinX: math.Min(aData.MinX, bData.MinX),
 		MinY: math.Min(aData.MinY, bData.MinY),
 		MaxX: math.Max(aData.MaxX, bData.MaxX),
-		MaxY: math.Max(aData.MaxX, bData.MaxY),
+		MaxY: math.Max(aData.MaxY, bData.MaxY),
 	}
 }
 
