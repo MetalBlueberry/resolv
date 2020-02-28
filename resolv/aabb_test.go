@@ -1,10 +1,8 @@
 package resolv
 
 import (
-	"encoding/json"
 	"math"
 	"math/rand"
-	"os"
 	"reflect"
 	"testing"
 	"time"
@@ -57,181 +55,185 @@ func TestMerge(t *testing.T) {
 }
 
 func TestAABBTree_Insert(t *testing.T) {
-	center := &AABBData{-1, -1, 1, 1}
-	left := &AABBData{-2, 0, -1, 1}
+	a := &AABBData{-1, -1, 1, 1}
+	b := &AABBData{-2, 0, -1, 1}
 
 	t.Run("Insert two nodes", func(t *testing.T) {
 		tree := NewAABBTree()
 		assert.Nil(t, tree.Root)
 
-		tree.Insert(center)
-		assert.Equal(t, tree.Root.Object, center)
+		tree.Insert(a)
+		assert.Equal(t, tree.Root.Object, a)
 
-		tree.Insert(left)
-		assert.NotEqual(t, tree.Root.Object, center)
-		assert.NotEqual(t, tree.Root.Object, left)
+		tree.Insert(b)
+		assert.NotEqual(t, tree.Root.Object, a)
+		assert.NotEqual(t, tree.Root.Object, b)
 	})
 
 	t.Run("Insert the same node twice", func(t *testing.T) {
 		tree := NewAABBTree()
 		assert.Nil(t, tree.Root)
 
-		tree.Insert(center)
-		assert.Equal(t, tree.Root.Object, center)
+		tree.Insert(a)
+		assert.Equal(t, tree.Root.Object, a)
 
-		tree.Insert(left)
-		assert.NotEqual(t, tree.Root.Object, center)
-		assert.NotEqual(t, tree.Root.Object, left)
+		tree.Insert(b)
+		assert.NotEqual(t, tree.Root.Object, a)
+		assert.NotEqual(t, tree.Root.Object, b)
 
 		// Same position doesn't mean equal
-		tree.Insert(left.Move(0, 0))
+		tree.Insert(b.Move(0, 0))
 
 		assert.Panics(t, func() {
-			tree.Insert(center)
+			tree.Insert(a)
 		})
 		assert.Panics(t, func() {
-			tree.Insert(left)
+			tree.Insert(b)
 		})
 	})
 }
 
-func TestAABBTree_BigTree(t *testing.T) {
-	tree := NewAABBTree()
-	base := AABBData{0, 0, 1, 1}
-	count := 1000
-	rand.Seed(time.Now().Unix())
+func TestAABBTree_query(t *testing.T) {
+	t.Run("Test performance", func(t *testing.T) {
+		tree := NewAABBTree()
+		base := AABBData{0, 0, 1, 1}
+		count := 1000
+		rand.Seed(time.Now().Unix())
 
-	brute := make([]AABB, 0, count)
-	t.Run("Build big tree", func(t *testing.T) {
-		start := time.Now()
-		assert.Nil(t, tree.Root)
-		for iterations := count; iterations > 0; iterations-- {
-			x := rand.Float64()*100 - 50
-			y := rand.Float64()*100 - 50
+		brute := make([]AABB, 0, count)
+		t.Run("Build big tree", func(t *testing.T) {
+			start := time.Now()
+			assert.Nil(t, tree.Root)
+			for iterations := count; iterations > 0; iterations-- {
+				x := rand.Float64()*100 - 50
+				y := rand.Float64()*100 - 50
 
-			object := base.Move(float64(x), float64(y))
-			tree.Insert(object)
-			brute = append(brute, object)
-		}
-		t.Log(time.Since(start))
-		t.Logf("Depth %d, min theorical depth %f", tree.Depth(), math.Log2(float64(count)))
-		t.Logf("\nroot %v,\nleft %v,\nright %v", tree.Root.AABB(), tree.Root.Left.AABB(), tree.Root.Right.AABB())
+				object := base.Move(float64(x), float64(y))
+				tree.Insert(object)
+				brute = append(brute, object)
+			}
+			t.Log(time.Since(start))
+			t.Logf("Depth %d, min theorical depth %f", tree.Depth(), math.Log2(float64(count)))
+		})
 
-	})
-	t.Run("Dump json", func(t *testing.T) {
-		file, err := os.Create("dump.json")
-		assert.Nil(t, err)
-		defer file.Close()
-		enc := json.NewEncoder(file)
-		enc.SetIndent("", " ")
-		err = enc.Encode(tree.Root)
-		assert.Nil(t, err)
+		t.Run("Performance comparisson", func(t *testing.T) {
+			start := time.Now()
+			queryOverlaps := tree.QueryOverlaps(&base)
+			queryTime := time.Since(start)
 
-	})
-	t.Run("Performance comparisson", func(t *testing.T) {
-		start := time.Now()
-		queryOverlaps := tree.QueryOverlaps(&base)
-		queryTime := time.Since(start)
+			start = time.Now()
+			bruteOverlaps := make([]AABB, 0)
+			for _, node := range brute {
+				if Overlaps(node, &base) {
+					bruteOverlaps = append(bruteOverlaps, node)
+					assert.Contains(t, queryOverlaps, node)
+				}
+			}
+			bruteTime := time.Since(start)
 
-		start = time.Now()
-		bruteOverlaps := make([]AABB, 0)
-		for _, node := range brute {
-			if Overlaps(node, &base) {
-				bruteOverlaps = append(bruteOverlaps, node)
+			t.Logf("Query Time over Brute Force %%%f", 100.0*queryTime.Seconds()/bruteTime.Seconds())
+
+			assert.Equal(t, len(queryOverlaps), len(bruteOverlaps))
+			assert.Less(t, queryTime.Seconds(), bruteTime.Seconds())
+			for _, node := range bruteOverlaps {
 				assert.Contains(t, queryOverlaps, node)
 			}
-		}
-		bruteTime := time.Since(start)
-
-		assert.Equal(t, len(queryOverlaps), len(bruteOverlaps))
-		assert.Less(t, queryTime.Seconds(), bruteTime.Seconds())
-		for _, node := range bruteOverlaps {
-			assert.Contains(t, queryOverlaps, node)
-		}
-
+		})
 	})
-}
 
-func TestAABBTree_BigTreeNonOverlap(t *testing.T) {
-	tree := NewAABBTree()
-	base := AABBData{0, 0, 1, 1}
-	count := 1000
-	rand.Seed(time.Now().Unix())
+	t.Run("Query empty tree", func(t *testing.T) {
+		a := NewAABBTreeNode(&AABBData{-1, -1, 1, 1})
 
-	brute := make([]AABB, 0, count)
-	t.Run("Build big tree", func(t *testing.T) {
-		start := time.Now()
-		assert.Nil(t, tree.Root)
-		rows := int(math.Sqrt(float64(count)))
-		positions := make([]int, count, count)
-		for iterations := 0; iterations < count; iterations++ {
-			positions[iterations] = iterations
-		}
-		rand.Shuffle(len(positions), func(i, j int) { positions[i], positions[j] = positions[j], positions[i] })
+		tree := NewAABBTree()
 
-		for _, n := range positions {
-			x := n % rows
-			y := n / rows
-			object := base.Move(float64(x), float64(y))
-			tree.Insert(object)
-			brute = append(brute, object)
-
-		}
-		t.Log(time.Since(start))
-		t.Logf("Depth %d, min theorical depth %f", tree.Depth(), math.Log2(float64(count)))
-		t.Logf("\nroot %v,\nleft %v,\nright %v", tree.Root.AABB(), tree.Root.Left.AABB(), tree.Root.Right.AABB())
-
-	})
-	t.Run("Dump json", func(t *testing.T) {
-		file, err := os.Create("dump.json")
-		assert.Nil(t, err)
-		defer file.Close()
-		enc := json.NewEncoder(file)
-		enc.SetIndent("", " ")
-		err = enc.Encode(tree.Root)
-		assert.Nil(t, err)
-
-	})
-	t.Run("Performance comparisson", func(t *testing.T) {
-		start := time.Now()
-		queryOverlaps := tree.QueryOverlaps(&base)
-		queryTime := time.Since(start)
-
-		start = time.Now()
-		bruteOverlaps := make([]AABB, 0)
-		for _, node := range brute {
-			if Overlaps(node, &base) {
-				bruteOverlaps = append(bruteOverlaps, node)
-				assert.Contains(t, queryOverlaps, node)
-			}
-		}
-		bruteTime := time.Since(start)
-
-		assert.Equal(t, len(queryOverlaps), len(bruteOverlaps))
-		assert.Less(t, queryTime.Seconds(), bruteTime.Seconds())
-		for _, node := range bruteOverlaps {
-			assert.Contains(t, queryOverlaps, node)
-		}
-
+		overlaps := tree.QueryOverlaps(a)
+		assert.Empty(t, overlaps)
 	})
 }
 
 func TestAABBTree_Remove(t *testing.T) {
-	tree := NewAABBTree()
-	center := NewAABBTreeNode(&AABBData{-1, -1, 1, 1})
-	left := NewAABBTreeNode(&AABBData{-2, 0, -1, 1})
-	t.Run("Build", func(t *testing.T) {
+	t.Run("Simple Insert/Removal", func(t *testing.T) {
+		tree := NewAABBTree()
+		a := NewAABBTreeNode(&AABBData{-1, -1, 1, 1})
+		b := NewAABBTreeNode(&AABBData{-2, 0, -1, 1})
+
 		assert.Nil(t, tree.Root)
 
-		tree.Insert(center)
-		assert.Equal(t, tree.Root.Object, center)
+		t.Run("Insert A", func(t *testing.T) {
+			tree.Insert(a)
+			assert.Equal(t, tree.Root.Object, a)
+			assert.Contains(t, tree.NodeIndexMap, a)
+			assert.NotContains(t, tree.NodeIndexMap, b)
+		})
 
-		tree.Insert(left)
-		assert.NotEqual(t, tree.Root.Object, center)
-		assert.NotEqual(t, tree.Root.Object, left)
+		t.Run("Insert B", func(t *testing.T) {
+			tree.Insert(b)
+			assert.NotEqual(t, tree.Root.Object, a)
+			assert.NotEqual(t, tree.Root.Object, b)
+			assert.Contains(t, tree.NodeIndexMap, a)
+			assert.Contains(t, tree.NodeIndexMap, b)
+		})
 
-		tree.Remove(center)
-		assert.Equal(t, tree.Root.Object, left)
+		t.Run("Remove A", func(t *testing.T) {
+			tree.Remove(a)
+			assert.Equal(t, tree.Root.Object, b)
+			assert.NotContains(t, tree.NodeIndexMap, a)
+			assert.Contains(t, tree.NodeIndexMap, b)
+		})
+	})
 
+	t.Run("Insert/Remove from big tree", func(t *testing.T) {
+		a := NewAABBTreeNode(&AABBData{-1, -1, 1, 1})
+		b := NewAABBTreeNode(&AABBData{-2, 0, -1, 1})
+
+		tree := NewAABBTree()
+		base := AABBData{0, 0, 1, 1}
+		count := 1000
+
+		t.Run("Insert B", func(t *testing.T) {
+			tree.Insert(b)
+			assert.NotContains(t, tree.NodeIndexMap, a)
+			assert.Contains(t, tree.NodeIndexMap, b)
+		})
+
+		brute := make([]AABB, 0, count)
+		t.Run("Build big tree", func(t *testing.T) {
+			for iterations := count; iterations > 0; iterations-- {
+				x := rand.Float64()*100 - 50
+				y := rand.Float64()*100 - 50
+
+				object := base.Move(float64(x), float64(y))
+				tree.Insert(object)
+				brute = append(brute, object)
+			}
+			assert.NotContains(t, tree.NodeIndexMap, a)
+			assert.Contains(t, tree.NodeIndexMap, b)
+		})
+
+		t.Run("Insert A", func(t *testing.T) {
+			tree.Insert(a)
+			assert.Contains(t, tree.NodeIndexMap, a)
+			assert.Contains(t, tree.NodeIndexMap, b)
+		})
+
+		t.Run("Remove A", func(t *testing.T) {
+			tree.Remove(a)
+			assert.NotContains(t, tree.NodeIndexMap, a)
+			assert.Contains(t, tree.NodeIndexMap, b)
+		})
+		t.Run("Remove B", func(t *testing.T) {
+			tree.Remove(b)
+			assert.NotContains(t, tree.NodeIndexMap, a)
+			assert.NotContains(t, tree.NodeIndexMap, b)
+		})
+
+	})
+
+	t.Run("Remove non existing object", func(t *testing.T) {
+		a := &AABBData{-1, -1, 1, 1}
+		tree := NewAABBTree()
+		assert.PanicsWithValue(t, ErrtNotInTree, func() {
+			tree.Remove(a)
+		})
 	})
 }

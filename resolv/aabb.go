@@ -3,8 +3,14 @@ package resolv
 // Inspired by https://www.azurefromthetrenches.com/introductory-guide-to-aabb-tree-collision-detection/
 
 import (
+	"errors"
 	"math"
 	"reflect"
+)
+
+var (
+	ErrtNotInTree    = errors.New("The object is not in the tree")
+	ErrAlreadyInTree = errors.New("The object is already in the tree")
 )
 
 type AABBData struct {
@@ -127,6 +133,10 @@ func (stack *aabbTreeNodeStack) Empty() bool {
 	return len(stack.data) == 0
 }
 
+func (tree *AABBTree) IsEmpty() bool {
+	return tree.Root == nil
+}
+
 func (tree *AABBTree) Depth() int {
 	stack := newAABBTreeNodeStack()
 	stack.Push(tree.Root)
@@ -151,16 +161,20 @@ func (tree *AABBTree) Depth() int {
 
 func (tree *AABBTree) Insert(object AABB) {
 	if tree.NodeIndexMap[object] != nil {
-		panic("You tried to insert an object in a tree that already contains it")
+		panic(ErrAlreadyInTree)
 	}
 
 	node := NewAABBTreeNode(object)
 	tree.insertLeaf(node)
 	tree.NodeIndexMap[object] = node
 }
+
 func (tree *AABBTree) Remove(object AABB) {
 
-	node := tree.NodeIndexMap[object]
+	node, ok := tree.NodeIndexMap[object]
+	if !ok {
+		panic(ErrtNotInTree)
+	}
 	tree.removeLeaf(node)
 	delete(tree.NodeIndexMap, object)
 }
@@ -338,6 +352,11 @@ func (tree *AABBTree) QueryOverlaps(object AABB) []AABB {
 	// 	std::stack<unsigned> stack;
 	// 	AABB testAabb = object->getAABB();
 	overlaps := make([]AABB, 0)
+
+	if tree.IsEmpty() {
+		return overlaps
+	}
+
 	stack := newAABBTreeNodeStack()
 	testAABB := object.AABB()
 	// 	stack.push(_rootNodeIndex);
