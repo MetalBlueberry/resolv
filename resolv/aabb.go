@@ -68,16 +68,25 @@ type AABB interface {
 }
 
 type AABBTree struct {
-	Root *AABBTreeNode
+	Root         *AABBTreeNode
+	NodeIndexMap map[AABB]*AABBTreeNode
+}
+
+func NewAABBTree() *AABBTree {
+	return &AABBTree{
+		NodeIndexMap: make(map[AABB]*AABBTreeNode),
+	}
 }
 
 type AABBTreeNode struct {
-	Object AABB
+	Object     AABB      `json:"-"`
+	ObjectAABB *AABBData `json:"aabb"`
 
-	Parent, Left, Right *AABBTreeNode
+	Parent *AABBTreeNode `json:"-"`
+	Left   *AABBTreeNode `json:"left"`
+	Right  *AABBTreeNode `json:"right"`
 
-	objectAABB *AABBData
-	depth      int
+	Depth int `json:"depth"`
 }
 
 func NewAABBTreeNode(object AABB) *AABBTreeNode {
@@ -86,7 +95,7 @@ func NewAABBTreeNode(object AABB) *AABBTreeNode {
 	}
 	return &AABBTreeNode{
 		Object:     object,
-		objectAABB: object.AABB(),
+		ObjectAABB: object.AABB(),
 	}
 }
 
@@ -94,55 +103,138 @@ func (node *AABBTreeNode) IsLeaf() bool {
 	return node.Left == nil
 }
 func (node *AABBTreeNode) AABB() *AABBData {
-	return node.objectAABB
+	return node.ObjectAABB
 }
 
-type AABBTreeNodeStack struct {
+type aabbTreeNodeStack struct {
 	data []*AABBTreeNode
 }
 
-func NewAABBTreeNodeStack() *AABBTreeNodeStack {
-	return &AABBTreeNodeStack{
+func newAABBTreeNodeStack() *aabbTreeNodeStack {
+	return &aabbTreeNodeStack{
 		data: make([]*AABBTreeNode, 0),
 	}
 }
-func (stack *AABBTreeNodeStack) Push(node *AABBTreeNode) {
+func (stack *aabbTreeNodeStack) Push(node *AABBTreeNode) {
 	stack.data = append(stack.data, node)
 }
-func (stack *AABBTreeNodeStack) Pop() *AABBTreeNode {
+func (stack *aabbTreeNodeStack) Pop() *AABBTreeNode {
 	next := stack.data[len(stack.data)-1]
 	stack.data = stack.data[:len(stack.data)-1]
 	return next
 }
-func (stack *AABBTreeNodeStack) Empty() bool {
+func (stack *aabbTreeNodeStack) Empty() bool {
 	return len(stack.data) == 0
 }
 
 func (tree *AABBTree) Depth() int {
-	stack := NewAABBTreeNodeStack()
+	stack := newAABBTreeNodeStack()
 	stack.Push(tree.Root)
 	var maxDepth int
 	for !stack.Empty() {
 		next := stack.Pop()
 		if next.Left != nil {
-			next.Left.depth = next.depth + 1
+			next.Left.Depth = next.Depth + 1
 			stack.Push(next.Left)
 		}
 		if next.Right != nil {
-			next.Right.depth = next.depth + 1
+			next.Right.Depth = next.Depth + 1
 			stack.Push(next.Right)
 		}
 
-		if maxDepth < next.depth+1 {
-			maxDepth = next.depth + 1
+		if maxDepth < next.Depth+1 {
+			maxDepth = next.Depth + 1
 		}
 	}
 	return maxDepth
 }
 
 func (tree *AABBTree) Insert(object AABB) {
+	if tree.NodeIndexMap[object] != nil {
+		panic("You tried to insert an object in a tree that already contains it")
+	}
+
 	node := NewAABBTreeNode(object)
 	tree.insertLeaf(node)
+	tree.NodeIndexMap[object] = node
+}
+func (tree *AABBTree) Remove(object AABB) {
+
+	node := tree.NodeIndexMap[object]
+	tree.removeLeaf(node)
+	delete(tree.NodeIndexMap, object)
+}
+func (tree *AABBTree) removeLeaf(node *AABBTreeNode) {
+	// // if the leaf is the root then we can just clear the root pointer and return
+	// if (leafNodeIndex == _rootNodeIndex)
+	if node == tree.Root {
+		// {
+		// 	_rootNodeIndex = AABB_NULL_NODE;
+		tree.Root = nil
+		// 	return;
+		// }
+	}
+
+	// AABBNode& leafNode = _nodes[leafNodeIndex];
+	// unsigned parentNodeIndex = leafNode.parentNodeIndex;
+	// const AABBNode& parentNode = _nodes[parentNodeIndex];
+	parent := node.Parent
+	// unsigned grandParentNodeIndex = parentNode.parentNodeIndex;
+	grandParent := parent.Parent
+	// unsigned siblingNodeIndex = parentNode.leftNodeIndex == leafNodeIndex ? parentNode.rightNodeIndex : parentNode.leftNodeIndex;
+
+	var sibling *AABBTreeNode
+	switch node {
+	case parent.Left:
+		sibling = parent.Right
+	case parent.Right:
+		sibling = parent.Left
+	default:
+		panic("parent doesn't contain children, Tree is corrupted.")
+	}
+	// assert(siblingNodeIndex != AABB_NULL_NODE); // we must have a sibling
+	// AABBNode& siblingNode = _nodes[siblingNodeIndex];
+
+	// if (grandParentNodeIndex != AABB_NULL_NODE)
+	if grandParent != nil {
+		// {
+		// 	// if we have a grand parent (i.e. the parent is not the root) then destroy the parent and connect the sibling to the grandparent in its
+		// 	// place
+		// 	AABBNode& grandParentNode = _nodes[grandParentNodeIndex];
+		switch parent {
+		case grandParent.Left:
+			grandParent.Left = sibling
+		case grandParent.Right:
+			grandParent.Right = sibling
+		}
+		// 	if (grandParentNode.leftNodeIndex == parentNodeIndex)
+		// 	{
+		// 		grandParentNode.leftNodeIndex = siblingNodeIndex;
+		// 	}
+		// 	else
+		// 	{
+		// 		grandParentNode.rightNodeIndex = siblingNodeIndex;
+		// 	}
+		// 	siblingNode.parentNodeIndex = grandParentNodeIndex;
+		parent = grandParent
+		// 	deallocateNode(parentNodeIndex);
+		// 	fixUpwardsTree(grandParentNodeIndex);
+		tree.fixUpwardsTree(grandParent)
+		// }
+	} else {
+		// else
+		// {
+		// 	// if we have no grandparent then the parent is the root and so our sibling becomes the root and has it's parent removed
+		tree.Root = sibling
+		sibling.Parent = nil
+		// 	_rootNodeIndex = siblingNodeIndex;
+		// 	siblingNode.parentNodeIndex = AABB_NULL_NODE;
+		// 	deallocateNode(parentNodeIndex);
+		// }
+	}
+	node.Parent = nil
+
+	// leafNode.parentNodeIndex = AABB_NULL_NODE;
 }
 
 func (tree *AABBTree) insertLeaf(node *AABBTreeNode) {
@@ -231,7 +323,7 @@ func (tree *AABBTree) insertLeaf(node *AABBTreeNode) {
 
 func (tree *AABBTree) fixUpwardsTree(node *AABBTreeNode) {
 	for node != nil {
-		node.objectAABB = Merge(node.Left, node.Right)
+		node.ObjectAABB = Merge(node.Left, node.Right)
 		node = node.Parent
 	}
 }
@@ -246,7 +338,7 @@ func (tree *AABBTree) QueryOverlaps(object AABB) []AABB {
 	// 	std::stack<unsigned> stack;
 	// 	AABB testAabb = object->getAABB();
 	overlaps := make([]AABB, 0)
-	stack := NewAABBTreeNodeStack()
+	stack := newAABBTreeNodeStack()
 	testAABB := object.AABB()
 	// 	stack.push(_rootNodeIndex);
 	// 	while(!stack.empty())
