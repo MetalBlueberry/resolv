@@ -7,7 +7,7 @@ import (
 // Resolve attempts to move the checking Shape with the specified X and Y values, returning a Collision object
 // if it collides with the specified other Shape. The deltaX and deltaY arguments are the movement displacement
 // in pixels. For platformers in particular, you would probably want to resolve on the X and Y axes separately.
-func Resolve(firstShape Shape, other Shape, deltaX, deltaY int32) Collision {
+func Resolve(firstShape Shape, other Shape, deltaX, deltaY float64) Collision {
 
 	out := Collision{}
 	out.ResolveX = deltaX
@@ -18,19 +18,19 @@ func Resolve(firstShape Shape, other Shape, deltaX, deltaY int32) Collision {
 		return out
 	}
 
-	x := float32(deltaX)
-	y := float32(deltaY)
+	x := deltaX
+	y := deltaY
 
 	primeX := true
-	slope := float32(0)
+	slope := 0.0
 
 	if math.Abs(float64(deltaY)) > math.Abs(float64(deltaX)) {
 		primeX = false
 		if deltaY != 0 && deltaX != 0 {
-			slope = float32(deltaX) / float32(deltaY)
+			slope = deltaX / deltaY
 		}
 	} else if deltaY != 0 && deltaX != 0 {
-		slope = float32(deltaY) / float32(deltaX)
+		slope = deltaY / deltaX
 	}
 
 	for true {
@@ -67,8 +67,8 @@ func Resolve(firstShape Shape, other Shape, deltaX, deltaY int32) Collision {
 
 			}
 
-			out.ResolveX = int32(x)
-			out.ResolveY = int32(y)
+			out.ResolveX = x
+			out.ResolveY = y
 			out.ShapeB = other
 
 		} else {
@@ -86,11 +86,11 @@ func Resolve(firstShape Shape, other Shape, deltaX, deltaY int32) Collision {
 }
 
 // Distance returns the distance from one pair of X and Y values to another.
-func Distance(x, y, x2, y2 int32) int32 {
+func Distance(x, y, x2, y2 float64) float64 {
 
 	dx := x - x2
 	dy := y - y2
 	ds := (dx * dx) + (dy * dy)
-	return int32(math.Sqrt(math.Abs(float64(ds))))
+	return math.Sqrt(math.Abs(float64(ds)))
 
 }

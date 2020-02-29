@@ -8,11 +8,11 @@ import (
 // Line represents a line, from one point to another.
 type Line struct {
 	BasicShape
-	X2, Y2 int32
+	X2, Y2 float64
 }
 
 // NewLine returns a new Line instance.
-func NewLine(x, y, x2, y2 int32) *Line {
+func NewLine(x, y, x2, y2 float64) *Line {
 	l := &Line{}
 	l.X = x
 	l.Y = y
@@ -42,7 +42,7 @@ func (l *Line) IsColliding(other Shape) bool {
 
 // IntersectionPoint represents a point of intersection from a Line with another Shape.
 type IntersectionPoint struct {
-	X, Y  int32
+	X, Y  float64
 	Shape Shape
 }
 
@@ -64,13 +64,13 @@ func (l *Line) GetIntersectionPoints(other Shape) []IntersectionPoint {
 			// MAGIC MATH; the extra + 1 here makes it so that corner cases (literally aiming the line through the corners of the
 			// hollow square in world5) works!
 
-			lambda := (float32(((l.Y-b.Y)*(b.X2-b.X))-((l.X-b.X)*(b.Y2-b.Y))) + 1) / float32(det)
+			lambda := (((l.Y - b.Y) * (b.X2 - b.X)) - ((l.X - b.X) * (b.Y2 - b.Y)) + 1) / det
 
-			gamma := (float32(((l.Y-b.Y)*(l.X2-l.X))-((l.X-b.X)*(l.Y2-l.Y))) + 1) / float32(det)
+			gamma := (((l.Y - b.Y) * (l.X2 - l.X)) - ((l.X - b.X) * (l.Y2 - l.Y)) + 1) / det
 
 			if (0 < lambda && lambda < 1) && (0 < gamma && gamma < 1) {
 				dx, dy := l.GetDelta()
-				intersections = append(intersections, IntersectionPoint{l.X + int32(lambda*float32(dx)), l.Y + int32(lambda*float32(dy)), other})
+				intersections = append(intersections, IntersectionPoint{l.X + lambda*dx, l.Y + lambda*dy, other})
 			}
 
 		}
@@ -112,7 +112,7 @@ func (l *Line) GetIntersectionPoints(other Shape) []IntersectionPoint {
 }
 
 // WouldBeColliding returns if the Line would be colliding if it were moved by the designated delta X and Y values.
-func (l *Line) WouldBeColliding(other Shape, dx, dy int32) bool {
+func (l *Line) WouldBeColliding(other Shape, dx, dy float64) bool {
 	l.X += dx
 	l.Y += dy
 	l.X2 += dx
@@ -127,7 +127,7 @@ func (l *Line) WouldBeColliding(other Shape, dx, dy int32) bool {
 
 // SetXY sets the position of the Line, also moving the end point of the line (so it wholly moves the line to the
 // specified position).
-func (l *Line) SetXY(x, y int32) {
+func (l *Line) SetXY(x, y float64) {
 	dx := x - l.X
 	dy := y - l.Y
 	l.X = x
@@ -137,7 +137,7 @@ func (l *Line) SetXY(x, y int32) {
 }
 
 // Move moves the Line by the values specified.
-func (l *Line) Move(x, y int32) {
+func (l *Line) Move(x, y float64) {
 	l.X += x
 	l.Y += y
 	l.X2 += x
@@ -145,7 +145,7 @@ func (l *Line) Move(x, y int32) {
 }
 
 // Center returns the center X and Y values of the Line.
-func (l *Line) Center() (int32, int32) {
+func (l *Line) Center() (float64, float64) {
 
 	x := l.X + ((l.X2 - l.X) / 2)
 	y := l.Y + ((l.Y2 - l.Y) / 2)
@@ -154,16 +154,16 @@ func (l *Line) Center() (int32, int32) {
 }
 
 // GetLength returns the length of the Line.
-func (l *Line) GetLength() int32 {
+func (l *Line) GetLength() float64 {
 	return Distance(l.X, l.Y, l.X2, l.Y2)
 }
 
 // SetLength sets the length of the Line to the value provided.
-func (l *Line) SetLength(length int32) {
+func (l *Line) SetLength(length float64) {
 
 	ln := l.GetLength()
-	xd := int32(float32(l.X2-l.X) / float32(ln) * float32(length))
-	yd := int32(float32(l.Y2-l.Y) / float32(ln) * float32(length))
+	xd := l.X2 - l.X/ln*length
+	yd := l.Y2 - l.Y/ln*length
 
 	l.X2 = l.X + xd
 	l.Y2 = l.Y + yd
@@ -172,8 +172,8 @@ func (l *Line) SetLength(length int32) {
 // GetBoundingRectangle returns a rectangle centered on the center point of the Line that would fully contain the Line.
 func (l *Line) GetBoundingRectangle() *Rectangle {
 
-	w := int32(math.Abs(float64(l.X2 - l.X)))
-	h := int32(math.Abs(float64(l.Y2 - l.Y)))
+	w := math.Abs(l.X2 - l.X)
+	h := math.Abs(l.Y2 - l.Y)
 
 	x := l.X
 
@@ -196,8 +196,8 @@ func (l *Line) GetBoundingCircle() *Circle {
 
 	x, y := l.Center()
 
-	radius := int32(math.Abs(float64(l.X2 - l.X)))
-	r2 := int32(math.Abs(float64(l.Y2 - l.Y)))
+	radius := math.Abs(l.X2 - l.X)
+	r2 := math.Abs(l.Y2 - l.Y)
 
 	if r2 > radius {
 		radius = r2
@@ -208,7 +208,7 @@ func (l *Line) GetBoundingCircle() *Circle {
 }
 
 // GetDelta returns the delta (or difference) between the start and end point of a Line.
-func (l *Line) GetDelta() (int32, int32) {
+func (l *Line) GetDelta() (float64, float64) {
 	dx := l.X2 - l.X
 	dy := l.Y2 - l.Y
 	return dx, dy
