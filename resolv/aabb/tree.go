@@ -15,88 +15,6 @@ func NewTree() *Tree {
 	}
 }
 
-type treeNode struct {
-	Object     AABB      `json:"-"`
-	ObjectAABB *AABBData `json:"aabb"`
-
-	Parent *treeNode `json:"-"`
-	Left   *treeNode `json:"left"`
-	Right  *treeNode `json:"right"`
-
-	Depth int `json:"depth"`
-}
-
-func newTreeNode(object AABB) *treeNode {
-	if reflect.ValueOf(object).Kind() != reflect.Ptr {
-		panic(ErrNotAReference)
-	}
-	return &treeNode{
-		Object:     object,
-		ObjectAABB: object.AABB(),
-	}
-}
-
-func (node *treeNode) IsLeaf() bool {
-	return node.Left == nil
-}
-
-func (node *treeNode) AABB() *AABBData {
-	return node.ObjectAABB
-}
-
-func (node *treeNode) GetSibling() *treeNode {
-	parent := node.Parent
-	if parent == nil {
-		panic("node doesn't contain a parent")
-	}
-	switch node {
-	case parent.Left:
-		return parent.Right
-	case parent.Right:
-		return parent.Left
-	default:
-		panic("parent doesn't contain children, Tree is corrupted.")
-	}
-}
-
-func (node *treeNode) replaceWith(other *treeNode) {
-	parent := node.Parent
-	if parent == nil {
-		panic("node doesn't contain a parent")
-	}
-	other.Parent = parent
-
-	switch node {
-	case parent.Left:
-		parent.Left = other
-	case parent.Right:
-		parent.Right = other
-	default:
-		panic("parent doesn't contain children, Tree is corrupted.")
-	}
-}
-
-type TreeNodeStack struct {
-	data []*treeNode
-}
-
-func newTreeNodeStack() *TreeNodeStack {
-	return &TreeNodeStack{
-		data: make([]*treeNode, 0),
-	}
-}
-func (stack *TreeNodeStack) Push(node *treeNode) {
-	stack.data = append(stack.data, node)
-}
-func (stack *TreeNodeStack) Pop() *treeNode {
-	next := stack.data[len(stack.data)-1]
-	stack.data = stack.data[:len(stack.data)-1]
-	return next
-}
-func (stack *TreeNodeStack) Empty() bool {
-	return len(stack.data) == 0
-}
-
 func (tree *Tree) IsEmpty() bool {
 	return tree.Root == nil
 }
@@ -166,18 +84,14 @@ func (tree *Tree) removeLeaf(node *treeNode) {
 
 func (tree *Tree) insertLeaf(node *treeNode) {
 
-	// if the tree is empty then we make the root the leaf
 	if tree.Root == nil {
 		tree.Root = node
 		return
 	}
 
-	// search for the best place to put the new leaf in the tree
-	// we use surface area and depth as search heuristics
 	currentNode := tree.Root
 	for !currentNode.IsLeaf() {
 
-		// because of the test in the while loop above we know we are never a leaf inside it
 		leftNode := currentNode.Left
 		rightNode := currentNode.Right
 
@@ -201,7 +115,6 @@ func (tree *Tree) insertLeaf(node *treeNode) {
 			break
 		}
 
-		// 	// otherwise descend in the cheapest direction
 		if costLeft < costRight {
 			currentNode = leftNode
 		} else {
@@ -209,8 +122,6 @@ func (tree *Tree) insertLeaf(node *treeNode) {
 		}
 	}
 
-	// // the leafs sibling is going to be the node we found above and we are going to create a new
-	// // parent node and attach the leaf and this item
 	sibling := currentNode
 	oldParent := sibling.Parent
 
@@ -254,21 +165,104 @@ func (tree *Tree) QueryOverlaps(object AABB) []AABB {
 	stack := newTreeNodeStack()
 	testAABB := object.AABB()
 	stack.Push(tree.Root)
+
 	for !stack.Empty() {
 		node := stack.Pop()
 
 		if Overlaps(node, testAABB) {
 			if node.IsLeaf() && node.Object != object {
 				overlaps = append(overlaps, node.Object)
-			} else {
-				if node.Left != nil {
-					stack.Push(node.Left)
-				}
-				if node.Right != nil {
-					stack.Push(node.Right)
-				}
+				continue
+			}
+			if node.Left != nil {
+				stack.Push(node.Left)
+			}
+			if node.Right != nil {
+				stack.Push(node.Right)
 			}
 		}
 	}
 	return overlaps
+}
+
+type treeNode struct {
+	Object     AABB      `json:"-"`
+	ObjectAABB *AABBData `json:"aabb"`
+
+	Parent *treeNode `json:"-"`
+	Left   *treeNode `json:"left"`
+	Right  *treeNode `json:"right"`
+
+	Depth int `json:"depth"`
+}
+
+func newTreeNode(object AABB) *treeNode {
+	if reflect.ValueOf(object).Kind() != reflect.Ptr {
+		panic(ErrNotAReference)
+	}
+	return &treeNode{
+		Object:     object,
+		ObjectAABB: object.AABB(),
+	}
+}
+
+func (node *treeNode) IsLeaf() bool {
+	return node.Left == nil
+}
+
+func (node *treeNode) AABB() *AABBData {
+	return node.ObjectAABB
+}
+
+func (node *treeNode) GetSibling() *treeNode {
+	parent := node.Parent
+	if parent == nil {
+		panic("node doesn't contain a parent")
+	}
+	switch node {
+	case parent.Left:
+		return parent.Right
+	case parent.Right:
+		return parent.Left
+	default:
+		panic("parent doesn't contain children, Tree is corrupted.")
+	}
+}
+
+func (node *treeNode) replaceWith(other *treeNode) {
+	parent := node.Parent
+	if parent == nil {
+		panic("node doesn't contain a parent")
+	}
+	other.Parent = parent
+
+	switch node {
+	case parent.Left:
+		parent.Left = other
+	case parent.Right:
+		parent.Right = other
+	default:
+		panic("parent doesn't contain children, Tree is corrupted.")
+	}
+}
+
+type treeNodeStack struct {
+	data []*treeNode
+}
+
+func newTreeNodeStack() *treeNodeStack {
+	return &treeNodeStack{
+		data: make([]*treeNode, 0),
+	}
+}
+func (stack *treeNodeStack) Push(node *treeNode) {
+	stack.data = append(stack.data, node)
+}
+func (stack *treeNodeStack) Pop() *treeNode {
+	next := stack.data[len(stack.data)-1]
+	stack.data = stack.data[:len(stack.data)-1]
+	return next
+}
+func (stack *treeNodeStack) Empty() bool {
+	return len(stack.data) == 0
 }
