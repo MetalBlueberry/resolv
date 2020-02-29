@@ -245,11 +245,6 @@ func (tree *Tree) QueryOverlaps(object AABB) []AABB {
 	if reflect.ValueOf(object).Kind() != reflect.Ptr {
 		panic(ErrNotAReference)
 	}
-	// std::forward_list<std::shared_ptr<IAABB>> AABBTree::queryOverlaps(const std::shared_ptr<IAABB>& object) const
-	// {
-	// 	std::forward_list<std::shared_ptr<IAABB>> overlaps;
-	// 	std::stack<unsigned> stack;
-	// 	AABB testAabb = object->getAABB();
 	overlaps := make([]AABB, 0)
 
 	if tree.IsEmpty() {
@@ -258,28 +253,13 @@ func (tree *Tree) QueryOverlaps(object AABB) []AABB {
 
 	stack := newTreeNodeStack()
 	testAABB := object.AABB()
-	// 	stack.push(_rootNodeIndex);
-	// 	while(!stack.empty())
-	// 	{
 	stack.Push(tree.Root)
 	for !stack.Empty() {
-		// 		unsigned nodeIndex = stack.top();
-		// 		stack.pop();
 		node := stack.Pop()
 
-		// 		if (nodeIndex == AABB_NULL_NODE) continue;
-
-		// 		const AABBNode& node = _nodes[nodeIndex];
 		if Overlaps(node, testAABB) {
-			// 		if (node.aabb.overlaps(testAabb))
-			// 		{
 			if node.IsLeaf() && node.Object != object {
-				// 			if (node.isLeaf() && node.object != object)
-				// 			{
 				overlaps = append(overlaps, node.Object)
-				// 				overlaps.push_front(node.object);
-				// 			}
-				// 			else
 			} else {
 				if node.Left != nil {
 					stack.Push(node.Left)
@@ -287,16 +267,8 @@ func (tree *Tree) QueryOverlaps(object AABB) []AABB {
 				if node.Right != nil {
 					stack.Push(node.Right)
 				}
-				// 			{
-				// 				stack.push(node.leftNodeIndex);
-				// 				stack.push(node.rightNodeIndex);
-				// 			}
-				// 		}
-				// 	}
 			}
 		}
 	}
 	return overlaps
-	// 	return overlaps;
-	// }
 }
